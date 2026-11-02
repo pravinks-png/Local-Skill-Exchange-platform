@@ -2,12 +2,12 @@
 
 **Thiagarajar College of Engineering**  
 *Department of Information Technology*  
-*Course: Web Technology (22IT591)*
+*Course: Web Technology (22IT550)*
 
 **Developed by:**
 * Pravin K S (2403917720521061)
-* Vignesh E (2403917720521087)
 * Vinothkumar G (2403917720521090)
+* Vignesh E (2403917720521087)
 
 ---
 
