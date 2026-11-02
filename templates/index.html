@@ -1,0 +1,521 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en" ng-app="skillExchangeApp">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SkillExchange - Peer-to-Peer Skill Sharing & Task Booking Platform</title>
+  <!-- Google Font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- Bootstrap Icons CDN -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="{% static 'css/style.css' %}">
+  <!-- AngularJS 1.8.2 -->
+  <script src="{% static 'js/angular.min.js' %}"></script>
+</head>
+<body ng-controller="SkillExchangeController">
+{% verbatim %}
+
+  <!-- Top Navigation Bar -->
+  <header class="navbar">
+    <div class="nav-brand" ng-click="setView('explore')">
+      <div class="brand-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+        </svg>
+      </div>
+      <span class="brand-name">SkillExchange</span>
+    </div>
+
+    <!-- Center Navigation Links -->
+    <nav class="nav-links">
+      <button class="nav-pill" ng-class="{'active': currentView === 'explore'}" ng-click="setView('explore')">
+        <i class="bi bi-compass"></i>
+        <span>Explore Skills</span>
+      </button>
+
+      <button class="nav-pill" ng-if="currentUser" ng-class="{'active': currentView === 'appointments'}" ng-click="setView('appointments')">
+        <i class="bi bi-calendar3"></i>
+        <span>My Appointments</span>
+        <span class="nav-pill-badge" ng-if="appointmentCount > 0">{{ appointmentCount }}</span>
+      </button>
+
+      <button class="nav-pill" ng-click="openOfferModal()">
+        <i class="bi bi-plus-circle"></i>
+        <span>Offer a Skill</span>
+      </button>
+    </nav>
+
+    <!-- Right Navigation (Auth) -->
+    <div class="nav-auth">
+      <!-- Logged Out State -->
+      <div ng-if="!currentUser" style="display: flex; gap: 10px;">
+        <button class="btn btn-outline" ng-click="setView('login')">
+          <i class="bi bi-box-arrow-in-right"></i>
+          <span>Log In</span>
+        </button>
+        <button class="btn btn-primary" ng-click="setView('register')">
+          <i class="bi bi-person-plus"></i>
+          <span>Sign Up</span>
+        </button>
+      </div>
+
+      <!-- Logged In State -->
+      <div ng-if="currentUser" style="display: flex; align-items: center; gap: 12px;">
+        <div class="user-badge">
+          <span class="user-avatar">{{ currentUser.name.charAt(0) }}</span>
+          <span>{{ currentUser.name }}</span>
+        </div>
+        <button class="btn btn-outline" ng-click="logout()" style="padding: 7px 12px; font-size: 0.825rem;">
+          <i class="bi bi-box-arrow-right"></i>
+          <span>Logout</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="container">
+
+    <!-- 1. EXPLORE & MARKETPLACE VIEW -->
+    <section ng-if="currentView === 'explore'">
+
+      <!-- Hero Banner -->
+      <div class="hero-card">
+        <div class="hero-content">
+          <h1 class="hero-title">Exchange Skills. Learn Fast. Get Things Done.</h1>
+          <p class="hero-subtitle">
+            Connect directly with skilled individuals in programming, design, audio, languages, and more. Book 1-on-1 tutoring sessions or hire help to finish your project directly.
+          </p>
+          <div class="hero-actions">
+            <button class="btn btn-white" ng-click="openOfferModal()">
+              <i class="bi bi-plus-circle-fill"></i>
+              <span>Offer Your Skill</span>
+            </button>
+            <button class="btn btn-outline-white" ng-click="selectCategory('All')">
+              <i class="bi bi-search"></i>
+              <span>Browse Skills</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Handshake Illustration Vector -->
+        <div class="hero-illustration">
+          <svg viewBox="0 0 24 24">
+            <path d="M12.5 11c-.3 0-.6-.1-.8-.3l-3-3a1.2 1.2 0 0 1 1.6-1.7l2.2 2.2 4.2-4.2a1.2 1.2 0 1 1 1.7 1.7l-5 5c-.3.2-.6.3-.9.3zM21 7.5a3.5 3.5 0 0 0-4.9-3.2l-3.3 3.3c-.6.6-1.5.6-2.1 0L7.5 4.4A3.5 3.5 0 0 0 2.5 8v8a3.5 3.5 0 0 0 3.5 3.5h12a3.5 3.5 0 0 0 3.5-3.5v-8.5z"/>
+          </svg>
+        </div>
+      </div>
+
+      <!-- Search & Category Filters -->
+      <div class="search-filter-card">
+        <div class="search-input-wrapper">
+          <input type="text" class="search-input" placeholder="Search skills, topics, or mentors..." ng-model="searchQuery" ng-change="onSearch()">
+        </div>
+        <div class="categories-pills">
+          <button class="cat-pill" ng-repeat="cat in categories" ng-class="{'active': activeCategory === cat}" ng-click="selectCategory(cat)">
+            {{ cat }}
+          </button>
+        </div>
+      </div>
+
+      <!-- Skills Cards Grid -->
+      <div class="skills-grid" ng-if="skills.length > 0">
+        <div class="skill-card" ng-repeat="skill in skills">
+          
+          <div class="skill-header">
+            <!-- Dynamic Category Tag -->
+            <span class="category-tag" ng-class="{
+              'tag-programming': skill.category === 'Programming',
+              'tag-music': skill.category === 'Music',
+              'tag-design': skill.category === 'Design',
+              'tag-audio-video': skill.category === 'Audio/Video',
+              'tag-languages': skill.category === 'Languages',
+              'tag-business': skill.category === 'Business'
+            }">{{ skill.category || 'GENERAL' }}</span>
+
+            <span class="level-indicator">
+              <i class="bi bi-stack"></i>
+              <span>{{ skill.level || 'All Levels' }}</span>
+            </span>
+          </div>
+
+          <h2 class="skill-title">{{ skill.title }}</h2>
+          <p class="skill-description">{{ skill.description }}</p>
+
+          <!-- Mode Badge -->
+          <div class="mode-badge-box">
+            <i class="bi bi-bullseye"></i>
+            <span>Mode: {{ skill.exchange_type || 'Both (Learn or Get Work Done)' }}</span>
+          </div>
+
+          <!-- Instructor Info -->
+          <div class="instructor-row">
+            <div class="instructor-avatar">
+              {{ (skill.offered_by.name || 'U').charAt(0) }}
+            </div>
+            <div class="instructor-meta">
+              <div class="instructor-name">{{ skill.offered_by.name }}</div>
+              <div class="instructor-email">{{ skill.offered_by.email }}</div>
+            </div>
+          </div>
+
+          <!-- Self Booking Prevention Condition -->
+          <button class="btn btn-disabled btn-full" ng-if="isOwnSkill(skill)">
+            <i class="bi bi-person-fill"></i>
+            <span>Your Skill Listing</span>
+          </button>
+
+          <button class="btn btn-primary btn-full" ng-if="!isOwnSkill(skill)" ng-click="openBookingModal(skill)">
+            <i class="bi bi-calendar-event"></i>
+            <span>Book Appointment</span>
+          </button>
+
+        </div>
+      </div>
+
+      <!-- No Skills Found State -->
+      <div class="empty-state" ng-if="skills.length === 0">
+        <div class="empty-state-icon"><i class="bi bi-search"></i></div>
+        <h3 class="empty-state-title">No skill listings found</h3>
+        <p class="empty-state-desc">Try clearing your search query or selecting a different category to see available listings.</p>
+        <button class="btn btn-primary" ng-click="searchQuery = ''; selectCategory('All')">Reset Filters</button>
+      </div>
+
+    </section>
+
+    <!-- 2. MY APPOINTMENTS VIEW -->
+    <section ng-if="currentView === 'appointments'">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Your Skill Appointments</h1>
+          <p class="page-subtitle">Manage upcoming learning appointments and work requests.</p>
+        </div>
+        <button class="btn btn-outline" ng-click="loadAppointments()">
+          <i class="bi bi-arrow-clockwise"></i>
+          <span>Refresh</span>
+        </button>
+      </div>
+
+      <div class="appointments-list" ng-if="appointments.length > 0">
+        <div class="appointment-card" ng-repeat="appt in appointments">
+          <div class="appointment-main">
+            <div class="appointment-badges">
+              <span class="status-badge" ng-class="{
+                'status-pending': appt.status === 'Pending',
+                'status-confirmed': appt.status === 'Confirmed',
+                'status-cancelled': appt.status === 'Cancelled',
+                'status-completed': appt.status === 'Completed'
+              }">{{ appt.status }}</span>
+
+              <span class="type-badge">
+                <i class="bi" ng-class="appt.type.indexOf('LEARN') !== -1 ? 'bi-mortarboard-fill' : 'bi-tools'"></i>
+                <span>{{ appt.type }}</span>
+              </span>
+            </div>
+
+            <h3 class="appointment-title">{{ appt.skill_title }}</h3>
+
+            <div class="appointment-meta">
+              <span class="meta-item"><i class="bi bi-calendar-check"></i> Date: {{ appt.session_date }}</span>
+              <span class="meta-item"><i class="bi bi-clock"></i> Time: {{ appt.session_time }}</span>
+              <span class="meta-item"><i class="bi bi-person-workspace"></i> Expert: {{ appt.provider.name }}</span>
+              <span class="meta-item"><i class="bi bi-person"></i> Requester: {{ appt.requester.name }}</span>
+            </div>
+
+            <div class="appointment-note" ng-if="appt.note">
+              <strong>Note:</strong> {{ appt.note }}
+            </div>
+          </div>
+
+          <!-- Actions based on role & status -->
+          <div class="appointment-actions">
+            <!-- If Provider and Pending: Accept or Decline -->
+            <div ng-if="isProvider(appt) && appt.status === 'Pending'" style="display: flex; gap: 8px;">
+              <button class="btn btn-success" ng-click="updateAppointmentStatus(appt, 'Confirmed')">
+                <i class="bi bi-check-lg"></i>
+                <span>Accept</span>
+              </button>
+              <button class="btn btn-outline" ng-click="updateAppointmentStatus(appt, 'Cancelled')">
+                <i class="bi bi-x-lg"></i>
+                <span>Decline</span>
+              </button>
+            </div>
+
+            <!-- If Provider and Confirmed: Mark Completed -->
+            <div ng-if="isProvider(appt) && appt.status === 'Confirmed'">
+              <button class="btn btn-primary" ng-click="updateAppointmentStatus(appt, 'Completed')">
+                <i class="bi bi-check2-circle"></i>
+                <span>Complete</span>
+              </button>
+            </div>
+
+            <!-- If Requester and Pending: Cancel Booking -->
+            <div ng-if="isRequester(appt) && appt.status === 'Pending'">
+              <button class="btn btn-outline" ng-click="updateAppointmentStatus(appt, 'Cancelled')">
+                <i class="bi bi-slash-circle"></i>
+                <span>Cancel Booking</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="empty-state" ng-if="appointments.length === 0">
+        <div class="empty-state-icon"><i class="bi bi-calendar2-x"></i></div>
+        <h3 class="empty-state-title">No appointments found</h3>
+        <p class="empty-state-desc">You don't have any booked sessions or incoming requests yet.</p>
+        <button class="btn btn-primary" ng-click="setView('explore')">Explore Community Skills</button>
+      </div>
+    </section>
+
+    <!-- 3. SIGN IN VIEW -->
+    <section ng-if="currentView === 'login'">
+      <div class="auth-wrapper">
+        <div class="auth-header">
+          <h2 class="auth-title">Sign In to SkillExchange</h2>
+          <p class="auth-subtitle">Login to exchange skills or manage your appointment schedule</p>
+        </div>
+
+        <form ng-submit="login()">
+          <div class="form-group">
+            <label class="form-label">Email Address</label>
+            <input type="email" class="form-control" ng-model="loginForm.email" placeholder="alex@example.com" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Password</label>
+            <input type="password" class="form-control" ng-model="loginForm.password" placeholder="••••••••" required>
+          </div>
+
+          <button type="submit" class="btn btn-primary btn-full" style="padding: 11px;">
+            <i class="bi bi-box-arrow-in-right"></i>
+            <span>Login</span>
+          </button>
+        </form>
+
+        <p class="auth-footer-text">
+          Don't have an account? <a href="#" ng-click="setView('register')">Sign up</a>
+        </p>
+
+        <!-- Quick Demo Credentials Box -->
+        <div class="demo-account-box">
+          <strong>Demo Account Ready:</strong>
+          <div>Email: alex@example.com</div>
+          <div>Password: demo123</div>
+          <div style="margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap;">
+            <button class="btn btn-outline" style="padding: 3px 8px; font-size: 0.75rem;" ng-click="quickFillDemo('alex@example.com', 'demo123')">Alex (Provider)</button>
+            <button class="btn btn-outline" style="padding: 3px 8px; font-size: 0.75rem;" ng-click="quickFillDemo('pravin@gmail.com', 'pravin123')">pravin (Developer)</button>
+            <button class="btn btn-outline" style="padding: 3px 8px; font-size: 0.75rem;" ng-click="quickFillDemo('vignesh@gmail.com', 'vignesh123')">vignesh (Learner)</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. SIGN UP VIEW -->
+    <section ng-if="currentView === 'register'">
+      <div class="auth-wrapper" style="max-width: 520px;">
+        <div class="auth-header">
+          <h2 class="auth-title">Create Your Account</h2>
+          <p class="auth-subtitle">Join our skill exchange community</p>
+        </div>
+
+        <form ng-submit="register()">
+          <div class="form-group">
+            <label class="form-label">Full Name</label>
+            <input type="text" class="form-control" ng-model="registerForm.name" placeholder="e.g. John Doe" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Email Address</label>
+            <input type="email" class="form-control" ng-model="registerForm.email" placeholder="john@example.com" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Password</label>
+            <input type="password" class="form-control" ng-model="registerForm.password" placeholder="Create secure password" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Bio / Short Intro</label>
+            <textarea class="form-control" rows="2" ng-model="registerForm.bio" placeholder="Tell the community what you do or what you enjoy learning..."></textarea>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Skills you can offer (comma separated)</label>
+            <input type="text" class="form-control" ng-model="registerForm.skills_offered" placeholder="e.g. Python, UI Design, Video Editing">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Skills you want to learn (comma separated)</label>
+            <input type="text" class="form-control" ng-model="registerForm.skills_wanted" placeholder="e.g. Spanish, Docker, Guitar">
+          </div>
+
+          <button type="submit" class="btn btn-primary btn-full" style="padding: 11px;">
+            <i class="bi bi-person-plus-fill"></i>
+            <span>Register Account</span>
+          </button>
+        </form>
+
+        <p class="auth-footer-text">
+          Already have an account? <a href="#" ng-click="setView('login')">Sign in</a>
+        </p>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- MODAL: OFFER A NEW SKILL -->
+  <div class="modal-backdrop" ng-if="showOfferModal" ng-click="closeOfferModal()">
+    <div class="modal-card" ng-click="$event.stopPropagation()">
+      <div class="modal-header">
+        <div>
+          <h2 class="modal-title">Offer a New Skill</h2>
+        </div>
+        <button class="modal-close" ng-click="closeOfferModal()">&times;</button>
+      </div>
+
+      <form ng-submit="publishSkill()">
+        <div class="form-group">
+          <label class="form-label">Skill Title</label>
+          <input type="text" class="form-control" ng-model="newSkill.title" placeholder="e.g. Full-Stack Python Web Development" required>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Category</label>
+            <select class="form-control" ng-model="newSkill.category">
+              <option value="Programming">Programming</option>
+              <option value="Design">Design</option>
+              <option value="Music">Music</option>
+              <option value="Audio/Video">Audio/Video</option>
+              <option value="Languages">Languages</option>
+              <option value="Business">Business</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Expertise Level</label>
+            <select class="form-control" ng-model="newSkill.level">
+              <option value="Beginner">Beginner</option>
+              <option value="Intermediate">Intermediate</option>
+              <option value="Expert">Expert</option>
+              <option value="All Levels">All Levels</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Exchange Purpose</label>
+          <select class="form-control" ng-model="newSkill.exchange_type">
+            <option value="Both (Teach or Get Things Done)">Both (Teach or Get Things Done)</option>
+            <option value="Learn Skill (Teaching / Mentoring)">Learn Skill (Teaching / Mentoring)</option>
+            <option value="Get Things Done (Task / Project)">Get Things Done (Task / Project)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Description & What You Offer</label>
+          <textarea class="form-control" rows="3" ng-model="newSkill.description" placeholder="Explain what topics you teach or what kind of tasks you can accomplish for others..."></textarea>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline" ng-click="closeOfferModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-send-fill"></i>
+            <span>Publish Skill</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: BOOK APPOINTMENT -->
+  <div class="modal-backdrop" ng-if="showBookingModal" ng-click="closeBookingModal()">
+    <div class="modal-card" ng-click="$event.stopPropagation()">
+      <div class="modal-header">
+        <div>
+          <h2 class="modal-title">Book Appointment</h2>
+          <p class="modal-subtitle">With {{ selectedSkill.offered_by.name }}</p>
+        </div>
+        <button class="modal-close" ng-click="closeBookingModal()">&times;</button>
+      </div>
+
+      <form ng-submit="confirmBooking()">
+        <div class="form-group">
+          <label class="form-label">Skill / Service</label>
+          <input type="text" class="form-control" ng-model="bookingData.skill_title" readonly>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Appointment Type / Goal</label>
+          <select class="form-control" ng-model="bookingData.type">
+            <option value="I want to Learn this skill (Mentoring / Teaching Session)">I want to Learn this skill (Mentoring / Teaching Session)</option>
+            <option value="I want to Get Work Done (Task Completion / Project Help)">I want to Get Work Done (Task Completion / Project Help)</option>
+          </select>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Preferred Date</label>
+            <input type="date" class="form-control" ng-model="bookingData.session_date" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Preferred Time Slot</label>
+            <select class="form-control" ng-model="bookingData.session_time">
+              <option value="09:00 AM">09:00 AM</option>
+              <option value="10:00 AM">10:00 AM</option>
+              <option value="11:00 AM">11:00 AM</option>
+              <option value="02:00 PM">02:00 PM</option>
+              <option value="04:00 PM">04:00 PM</option>
+              <option value="06:00 PM">06:00 PM</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Notes / Questions / Details for the expert</label>
+          <textarea class="form-control" rows="3" ng-model="bookingData.note" placeholder="Provide details on what you need help with or specific questions..."></textarea>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline" ng-click="closeBookingModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-calendar-check-fill"></i>
+            <span>Confirm Booking</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div class="toast-container" ng-if="toast">
+    <div class="toast" ng-class="{
+      'toast-success': toast.type === 'success',
+      'toast-error': toast.type === 'error',
+      'toast-info': toast.type === 'info'
+    }">
+      <i class="bi" ng-class="{
+        'bi-check-circle-fill': toast.type === 'success',
+        'bi-exclamation-triangle-fill': toast.type === 'error',
+        'bi-info-circle-fill': toast.type === 'info'
+      }"></i>
+      <span>{{ toast.message }}</span>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="footer">
+    Built with <strong>AngularJS</strong>, <strong>Django</strong>, and <strong>MongoDB</strong> • SkillExchange Demo Platform
+  </footer>
+
+{% endverbatim %}
+  <!-- Custom JS -->
+  <script src="{% static 'js/app.js' %}"></script>
+</body>
+</html>
